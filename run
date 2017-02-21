@@ -1,0 +1,125 @@
+#!/usr/bin/perl -w
+
+use strict;
+use warnings;
+
+use File::Find;
+use JSON;
+
+#
+# Start script to run author attribution code.
+# Usage: ./run <script name> <path to dataset>
+# Path to dataset should contain directories with meta-info.json files.
+# Path will be searched recursively and results put in answers.txt files
+# Ground truth files will be used to measure accuracy.
+#
+
+sub usage
+{
+    return <<ENDUSAGE;
+Usage: $0 <script name> <path to dataset>
+ENDUSAGE
+}
+
+our @ARGV;
+
+if (@ARGV < 2) {
+	die usage();
+}
+
+my $wanted = 'meta-file.json';
+my $answers = 'answers.json';
+my $ground_truth = 'ground-truth.json';
+my ($CORRECT, $TOTAL) = (0, 0);
+
+my ($script_name, $path) = @ARGV[0..1];
+
+sub read_json
+{
+    my $file = shift;
+
+    open (my $fh, "<:encoding(UTF-8)", $file) or die "Error opening $file: $!\n";
+    my $text;
+    {
+        local $/;
+        $text = <$fh>;
+    }
+    close $fh;
+    my $json = JSON->new;
+    my $data = $json->decode($text);
+    return $data;
+}
+
+#
+# Determine the accuracy of the answers file against the ground truth file
+sub accuracy
+{
+    my ($answers_file, $truth_file) = @_;
+
+    my $a = read_json($answers_file);
+    my $truth = read_json($truth_file);
+
+    my %real = ();
+    foreach my $element (@{$truth->{'ground-truth'}}) {
+        $real{$element->{'unknown-text'}} = $element->{'true-author'};
+    }
+    
+    my $total = 0;
+    my $correct = 0;
+    foreach my $element (@{$a->{'answers'}}) {
+        $total += 1;
+        my $txt = $element->{'unknown_text'};
+        if ($real{$txt} eq $element->{'author'}) {
+            $correct += 1;
+        }
+    }
+    return ($correct, $total);
+}
+
+sub generate_answers_file 
+{
+    my $answers_rename = $script_name;
+    $answers_rename =~ s/^[\.\/]+//;
+    $answers_rename =~ s/\..*//;
+    $answers_rename .= '-' . $answers;
+    return $answers_rename;
+}
+
+sub evaluate
+{
+    if ($_ =~ /$wanted/) {
+        my $answers_rename = generate_answers_file();
+        my ($c, $t) = accuracy("${File::Find::dir}/$answers_rename", 
+                                "${File::Find::dir}/$ground_truth");
+        $CORRECT += $c;
+        $TOTAL += $t;
+    }
+}
+
+sub found
+{
+    # $_ contains the name of the file found - meta-file.json
+    # $File::Find::dir is the current directory name
+    if ($_ =~ /$wanted/) {
+        my @args = ("-i", "$File::Find::dir", "-o", "$File::Find::dir");
+        print "Executing $script_name @args\n";
+        system $script_name, @args;
+        # Rename the answers file according to the current script name
+        my $answers_rename = generate_answers_file();
+        print "Renaming ${File::Find::dir}/$answers to ${File::Find::dir}/$answers_rename\n";
+        rename "${File::Find::dir}/$answers", "${File::Find::dir}/$answers_rename";
+    }
+}
+
+find( {'wanted' => \&found, 
+        'no_chdir' => 1 }, 
+        $path);
+    
+find( {'wanted' => \&evaluate, 
+        'no_chdir' => 1 }, 
+        $path);
+
+print "Correct: $CORRECT, TOTAL: $TOTAL\n";
+if ($TOTAL > 0) {
+    print "Accuracy: " . ($CORRECT / $TOTAL) . "\n";
+}
