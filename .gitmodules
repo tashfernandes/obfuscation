@@ -1,0 +1,12 @@
+[submodule "koppel11"]
+	path = koppel11
+	url = https://github.com/pan-webis-de/koppel11
+[submodule "stamatatos07"]
+	path = stamatatos07
+	url = https://github.com/pan-webis-de/stamatatos07
+[submodule "keselj03"]
+	path = keselj03
+	url = https://github.com/pan-webis-de/keselj03
+[submodule "benedetto02"]
+	path = benedetto02
+	url = https://github.com/pan-webis-de/benedetto02
