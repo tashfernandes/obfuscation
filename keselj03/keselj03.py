@@ -1,3 +1,5 @@
+#!/usr/local/bin/python
+
 from collections import Counter
 
 import argparse
