@@ -1,3 +1,4 @@
+#!/usr/local/bin/python
 '''-- Jakob Koehler & Tolga Buz
 Reproduction of Koppel11
 '''
