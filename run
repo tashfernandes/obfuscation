@@ -79,7 +79,7 @@ sub accuracy
 sub generate_answers_file 
 {
     my $answers_rename = $script_name;
-    $answers_rename =~ s/^[\.\/]+//;
+    $answers_rename =~ s/.+\///;
     $answers_rename =~ s/\..*//;
     $answers_rename .= '-' . $answers;
     return $answers_rename;
