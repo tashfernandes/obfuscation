@@ -23,7 +23,7 @@ from time import time
 # The closer the output is to 1, the more similar it is.
 def generate_laplace_similarity(scale):
     theta = np.random.laplace(scale=scale)
-    while math.abs(theta) > (math.pi / 4):
+    while math.fabs(theta) > (math.pi / 4):
         theta = np.random.laplace(scale=scale)
     return math.cos(theta + (math.pi/4))
 
@@ -66,10 +66,10 @@ def run_bow_classifier(data_train, data_test, feature_names):
     return X_train, X_test, new_data_test
 
 # Create a noisy bag of words document given a bow document
-def create_noisy_doc(doc):
+def create_noisy_doc(doc, scale):
     newdoc = []
     for word in doc:
-        noise = generate_laplace_similarity(0.5) # arbitrary epsilon!!!
+        noise = generate_laplace_similarity(scale) 
         if word in model.vocab:
             syn = find_closest_word(word, noise)
             newdoc.append(syn)
@@ -78,11 +78,11 @@ def create_noisy_doc(doc):
 # For every test document, create a noisy bag of words document and then
 # run the classifier on the noisy document.
 # Feature_names is a list of features to create a topic bow
-def run_noisy_classifier(data_train, bow_test):
+def run_noisy_classifier(data_train, bow_test, scale):
     new_data_test = []
     
     for test_doc in bow_test:
-        noisy_bow = create_noisy_doc(test_doc)
+        noisy_bow = create_noisy_doc(test_doc.split(), scale)
         noisy_bow = " ".join(noisy_bow)
         noisy_bow = re.sub(r"_", r" ", noisy_bow)
         new_data_test.append(noisy_bow)
@@ -108,7 +108,7 @@ def load_test_data():
 data_train, data_authors, y_train, train_files = load_training_data()
 data_test, data_test_authors, y_test, test_files = load_test_data()
 
-NUM_FEATURES = 100
+NUM_FEATURES = 50
 
 feature_names, X_train_std, X_test_std = run_standard_classifier(NUM_FEATURES, data_train, y_train, data_test) 
 
@@ -122,7 +122,11 @@ train = {'x' : X_train_bow, 'y' : y_train}
 test = {'x' : X_test_bow, 'y': y_test}
 bow_score = classify(train, test)
 
-X_train_noisy, X_test_noisy, noisy_bow_test = run_noisy_classifier(data_train, bow_test)
+radius = 1.5
+epsilon = 10.0
+scale = float(radius/epsilon)
+
+X_train_noisy, X_test_noisy, noisy_bow_test = run_noisy_classifier(data_train, bow_test, scale)
 train = {'x' : X_train_noisy, 'y' : y_train}
 test = {'x' : X_test_noisy, 'y': y_test}
 noisy_score = classify(train, test) 
