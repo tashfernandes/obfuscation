@@ -6,19 +6,18 @@ import gensim
 model = gensim.models.KeyedVectors.load_word2vec_format('../../word2vec/GoogleNews-vectors-negative300.bin', binary=True)
 model.init_sims(replace=True)
 
-# Finds the closest word in Word2Vec to the given word with the given cosine similarity.
-saved_lookups = {}
-
 def generate_bow_doc(doc, feature_names):
     vectorizer = CountVectorizer(max_df=0.5,stop_words='english')
     tokeniser = vectorizer.build_analyzer()
-    bow = [w for w in tokeniser(doc) if w in feature_names and word in model.vocab]
+    bow = [w for w in tokeniser(doc) if w in feature_names and w in model.vocab]
     return bow
 
-# This code finds the closest word (in terms of cosine similarity) at distance sim to the given word
+# Finds the closest word in Word2Vec to the given word with the given cosine similarity.
+saved_lookups = {}
+
 def find_closest_word(word, sim):
     global saved_lookups
-    search_size = 200
+    search_size = 2000
     closest_matches = []
     loops = 0
     
