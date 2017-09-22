@@ -66,11 +66,11 @@ def run_bow_classifier(data_train, data_test, feature_names):
     return X_train, X_test, new_data_test
 
 # Create a noisy bag of words document given a bow document
-def create_noisy_doc(doc, scale):
+def create_noisy_doc(doc, scale, model):
     newdoc = []
     for word in doc:
-        noise = generate_laplace_similarity(scale) 
-        if word in model.vocab:
+        if word != 'XXXX' and word in model.vocab:
+            noise = generate_laplace_similarity(scale) 
             syn = find_closest_word(word, noise)
             newdoc.append(syn)
     return newdoc
@@ -94,42 +94,125 @@ def run_noisy_classifier(data_train, bow_test, scale):
     X_test = vectorizer.transform(new_data_test)
     return X_train, X_test, new_data_test
 
-def load_training_data():
-    indir = 'datasets/reuters/corpus-final/'
+def load_training_data(homedir=""):
+    indir = homedir+'datasets/reuters/corpus-final/'
     datafiles, targets = load_data(indir)
     return load_xml(datafiles, targets)
 
-def load_test_data():
-    indir = 'datasets/reuters/corpus-test/'
+def load_test_data(homedir=""):
+    indir = homedir+'datasets/reuters/corpus-test/'
     datafiles, targets = load_data(indir)
     return load_xml(datafiles, targets)
-    
+
+def load_bow_data(homedir=""):
+    indir = homedir+"datasets/reuters/problem-bow/unknown/"
+    feature_file = homedir+"datasets/reuters/problem-bow/features.txt"
+
+    features = []
+    with open(features_file, 'r') as f:
+        s = f.read()
+        features.extend(s.split(' '))
+    data, filenames = load_text_data(indir)
+    return data, filenames, features
+
+def load_func_data(homedir=""):
+    indir = homedir+"datasets/reuters/problem-func/unknown/"
+    return load_text_data(indir)
+
 # Load files for processing.
-data_train, data_authors, y_train, train_files = load_training_data()
-data_test, data_test_authors, y_test, test_files = load_test_data()
+homedir = "/home/natasha/data/"
+data_train, data_authors, y_train, train_files, train_targets = load_training_data(homedir)
+data_test, data_test_authors, y_test, test_files, test_targets = load_test_data(homedir)
 
-NUM_FEATURES = 50
+#NUM_FEATURES = 1000
 
-feature_names, X_train_std, X_test_std = run_standard_classifier(NUM_FEATURES, data_train, y_train, data_test) 
+#feature_names, X_train_std, X_test_std = run_standard_classifier(NUM_FEATURES, data_train, y_train, data_test) 
 
-train = {'x' : X_train_std, 'y' : y_train}
-test = {'x' : X_test_std, 'y': y_test}
-std_score = classify(train, test)
+#train = {'x' : X_train_std, 'y' : y_train}
+#test = {'x' : X_test_std, 'y': y_test}
+#std_score = classify(train, test)
 
 # Build a classifier using the top n features for test only and predict a result
-X_train_bow, X_test_bow, bow_test = run_bow_classifier(data_train, data_test, feature_names) 
-train = {'x' : X_train_bow, 'y' : y_train}
-test = {'x' : X_test_bow, 'y': y_test}
-bow_score = classify(train, test)
+#X_train_bow, X_test_bow, bow_test = run_bow_classifier(data_train, data_test, feature_names) 
+#train = {'x' : X_train_bow, 'y' : y_train}
+#test = {'x' : X_test_bow, 'y': y_test}
+#bow_score = classify(train, test)
 
 radius = 1.5
-epsilon = 10.0
+epsilon = 1.0
 scale = float(radius/epsilon)
 
-X_train_noisy, X_test_noisy, noisy_bow_test = run_noisy_classifier(data_train, bow_test, scale)
-train = {'x' : X_train_noisy, 'y' : y_train}
-test = {'x' : X_test_noisy, 'y': y_test}
-noisy_score = classify(train, test) 
+output_range = slice(0,2)
+
+#bow_test = []
+#for doc in data_test:
+#    bow = generate_bow_doc(doc, feature_names)
+#    bow_test.append(" ".join(bow))
+
+#bow_test, bow_files, feature_names = load_bow_data()
+func_test, func_files = load_func_data(homedir)
+
+print("Data laoded!")
+
+model = load_model()
+
+# write out the noisy documents
+noisy_test = []
+for test_doc in func_test[output_range]:
+    noisy_bow = create_noisy_doc(test_doc.split(), scale, model)
+    noisy_bow = " ".join(noisy_bow)
+    noisy_bow = re.sub(r"_", r" ", noisy_bow)
+    noisy_test.append(noisy_bow)
+
+#print(noisy_test)
+
+testonly = True
+
+outdir = homedir + "datasets/reuters/problem-func-obf/"
+metafile = outdir + "meta-file.json"
+metadata = {
+    "folder" : "unknown",
+    "language": "EN",
+    "encoding": "UTF8",
+    "candidate-authors" : [],
+    "unknown-texts" : []
+}   
+
+groundfile = outdir + "ground-truth.json"
+grounddata = {
+    "ground-truth" : []
+}
+
+#training = {
+#    'data' : bow_train,
+#    'authors' : data_authors,
+#    'targets' : data_targets,
+#    'files' : train_files,
+#    'target_names' : train_targets
+#}
+
+test = {
+    'data' : noisy_test,
+    'authors' : data_test_authors[output_range],
+    'targets' : y_test[output_range],
+    'files' : func_files[output_range]
+}
+#if not testonly:
+#    metadata = write_training_data(training, outdir, metadata)
+metadata, grounddata = write_obf_data(test, outdir, metadata, grounddata)
+
+if not testonly:
+    with open(metafile, 'w') as meta:
+        json.dump(metadata, meta)
+    
+with open(groundfile, 'w') as ground:
+    json.dump(grounddata, ground)
+
+
+#X_train_noisy, X_test_noisy, noisy_bow_test = run_noisy_classifier(data_train, bow_test, scale)
+#train = {'x' : X_train_noisy, 'y' : y_train}
+#test = {'x' : X_test_noisy, 'y': y_test}
+#noisy_score = classify(train, test) 
 #save_json(noisy_bow_test, "datasets/reuters/corpus-noisy/noisy_test_" + str(NUM_FEATURES) + ".json")
 
 #for i in range(10):

@@ -3,8 +3,13 @@ import numpy as np
 import gensim
 
 # Load Google's pre-trained Word2Vec model.
-model = gensim.models.KeyedVectors.load_word2vec_format('../../word2vec/GoogleNews-vectors-negative300.bin', binary=True)
-model.init_sims(replace=True)
+model = None
+
+def load_model():
+    global model
+    model = gensim.models.KeyedVectors.load_word2vec_format('../../word2vec/GoogleNews-vectors-negative300.bin', binary=True)
+    model.init_sims(replace=True)
+    return model
 
 def generate_bow_doc(doc, feature_names):
     vectorizer = CountVectorizer(max_df=0.5,stop_words='english')
@@ -17,7 +22,7 @@ saved_lookups = {}
 
 def find_closest_word(word, sim):
     global saved_lookups
-    search_size = 2000
+    search_size = 20000
     closest_matches = []
     loops = 0
     
@@ -40,7 +45,8 @@ def find_closest_word(word, sim):
 
         # the best index was at the end.. check the next array just in case it contains closer words
         closest_matches = model.most_similar(positive=[word], topn=search_size*2)
-        saved_lookups[word] = closest_matches
+        # Don't use this for now...
+        #saved_lookups[word] = closest_matches
         closest_matches = closest_matches[(search_size-1):]        
         search_size = search_size * 2 
 
