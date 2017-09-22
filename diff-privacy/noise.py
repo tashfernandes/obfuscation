@@ -69,7 +69,7 @@ def run_bow_classifier(data_train, data_test, feature_names):
     return X_train, X_test, new_data_test
 
 # Create a noisy bag of words document given a bow document
-def create_noisy_doc(doc, scale, model):
+def create_noisy_doc(doc, scale):
     newdoc = []
     for word in doc:
         if word != 'XXXX' and word in model.vocab:
@@ -129,7 +129,7 @@ def load_file(filename):
     return data
 
 def obfuscate(data):
-    infile, outdir, scale, model = data
+    infile, outdir, scale = data
     doc = load_file(infile)
     print(doc)
     #noisy_doc = create_noisy_doc(doc.split(), scale, model)
@@ -146,7 +146,7 @@ def main(input_dir, output_dir):
     epsilon = 10.0
     scale = float(radius/epsilon)
 
-    params = [(os.path.join(input_dir, file), output_dir, model, scale) for file in files]
+    params = [(os.path.join(input_dir, file), output_dir, scale) for file in files]
     pool = Pool()
     pool.map(obfuscate, params)
 
