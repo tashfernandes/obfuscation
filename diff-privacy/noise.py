@@ -7,19 +7,55 @@ from sklearn import metrics
 import numpy as np
 import argparse
 import os
+import gensim
 from multiprocessing import Pool
 
 import json
 import math
 
 from util import *
-from word2vec import *
 
 from time import time
 
 #
 # This code loads reuters files, converts to bag of topic words and runs a classifier over them.
 #
+
+def load_model(homedir):
+    global model
+    model = gensim.models.KeyedVectors.load_word2vec_format(homedir+'word2vec/GoogleNews-vectors-negative300.bin', binary=True)
+    model.init_sims(replace=True)
+    return model
+
+def generate_bow_doc(doc, feature_names):
+    vectorizer = CountVectorizer(max_df=0.5,stop_words='english')
+    tokeniser = vectorizer.build_analyzer()
+    bow = [w for w in tokeniser(doc) if w in feature_names and w in model.vocab]
+    return bow
+
+def find_closest_word(word, sim):
+    search_size = 20000
+    closest_matches = []
+    loops = 0
+    
+    closest_matches = model.most_similar(positive=[word], topn=search_size)
+        
+    while (True):
+        # sim_scores contains the closest match similarity scores for each potential match
+        sim_scores = np.array([ m[1] for m in closest_matches])
+        # best_val contains the index of the closest score
+        best_val = np.abs(sim_scores - sim).argmin()
+        # If this index is NOT at the end, choose it
+        loops += 1
+        if loops > 100 or best_val < (len(closest_matches) - 1):
+            return closest_matches[best_val][0]
+
+        # the best index was at the end.. check the next array just in case it contains closer words
+        closest_matches = model.most_similar(positive=[word], topn=search_size*2)
+        # Don't use this for now...
+        closest_matches = closest_matches[(search_size-1):]        
+        search_size = search_size * 2 
+
 
 # Generate a noise angle in radians, making sure it is within the correct range.
 # Return the cosine of the angle so we can use it with similarity measures in Word2Vec
@@ -69,10 +105,10 @@ def run_bow_classifier(data_train, data_test, feature_names):
     return X_train, X_test, new_data_test
 
 # Create a noisy bag of words document given a bow document
-def create_noisy_doc(doc, scale, model):
+def create_noisy_doc(doc, scale):
     newdoc = []
     for word in doc:
-        if word != 'XXXX' and word in model.vocab:
+        if (not re.search(r'XXXX', word)) and word in model.vocab:
             noise = generate_laplace_similarity(scale) 
             syn = find_closest_word(word, noise)
             newdoc.append(syn)
@@ -128,26 +164,31 @@ def load_file(filename):
         data = f.read()
     return data
 
+def save_file(outdir, filename, content):
+    if not os.path.exists(outdir):
+        os.makedirs(outdir)
+    with open(os.path.join(outdir, filename), 'w+', encoding='utf-8') as f:
+        f.write(content)
+
+
 def obfuscate(data):
-    infile, outdir, scale, model = data
+    infile, outdir, scale = data
     doc = load_file(infile)
-    print(doc)
-    #noisy_doc = create_noisy_doc(doc.split(), scale, model)
-    #noisy_doc = " ".join(noisy_doc)
-    #noisy_doc = re.sub(r"_", r" ", noisy_doc)
-    #return noisy_doc
+    noisy_doc = create_noisy_doc(doc.split(), scale)
+    noisy_doc = " ".join(noisy_doc)
+    noisy_doc = re.sub(r"_", r" ", noisy_doc)
+    save_file(outdir, os.path.basename(infile), noisy_doc)
 
 
 def main(input_dir, output_dir):
 
     files = os.listdir(input_dir)
-    model = load_model()
     radius = 1.5
-    epsilon = 10.0
+    epsilon = 1.0
     scale = float(radius/epsilon)
 
-    params = [(os.path.join(input_dir, file), output_dir, model, scale) for file in files]
-    pool = Pool()
+    params = [(os.path.join(input_dir, file), output_dir, scale) for file in files]
+    pool = Pool(5)
     pool.map(obfuscate, params)
 
 
@@ -163,4 +204,6 @@ if __name__ == '__main__':
     if not input_dir or not output_dir:
         parser.print_help()
     else:
+        homedir = "/home/natasha/data/"
+        model = load_model(homedir)
         main(input_dir, output_dir)
