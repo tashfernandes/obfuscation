@@ -45,27 +45,25 @@ def load_file(filename):
 def main(input_dir, output_dir, out_file):
     # 1. Need to generate wmd. Load files, pick first one as references, and
     # calculate distances of other files from this one.
+
+    # Let's not use a reference, just calculate pairwise distances
+    data = []
     filenames = os.listdir(input_dir)
-    reference_file = filenames[0]
-    filenames = filenames[1:]
+    for f in filenames:
+        d = load_file(os.path.join(input_dir, f))
+        data.append(d)
 
     model = gensim.models.KeyedVectors.load_word2vec_format('../../word2vec/GoogleNews-vectors-negative300.bin', binary=True)
     model.init_sims(replace=True)
 
     distances = []
-    data = []
 
-    doc1 = load_file(os.path.join(input_dir, reference_file))
-    data.append(doc1)
-    doc1 = doc1.split()
-    for f in filenames:
-        doc2 = load_file(os.path.join(input_dir, f))
-        data.append(doc2)
-        doc2 = doc2.split()
-        #dist = random.randint(1,100)
-        dist = model.wv.wmdistance(doc1, doc2)
-        print("Adding distance b/w " + reference_file + " and " + f + " of " + str(dist))
-        distances.append( { 'd1' : reference_file, 'd2' : f, 'distance' : dist }) 
+    for i in range(len(data)):
+        doc1 = data[i].split()
+        for j in range(i+1, len(data)):
+            doc2 = data[j].split()
+            dist = model.wv.wmdistance(doc1, doc2)
+            distances.append( { 'd1' : filenames[i], 'd2' : filenames[j], 'distance' : dist }) 
 
     # 2. Calculate the ruzicka distance for these files
     n=4
@@ -73,13 +71,16 @@ def main(input_dir, output_dir, out_file):
     v = CountVectorizer(analyzer=char_wb_ngrams, ngram_range=(n,n), max_features=featureLength)
     ngrams = v.fit_transform(data)
    
-    row1 = 0
+    idx = 0
     for i in range(len(filenames)):
-        row2 = i+1
-        minsum = ngrams[[row1, row2]].min(0).sum()
-        maxsum = ngrams[[row1, row2]].max(0).sum()
-        ruzicka = 1.0 - ( float(minsum) / maxsum)
-        distances[i]['ruzicka'] = ruzicka
+        row1 = i
+        for j in range(i+1, len(filenames)):
+            row2 = j
+            minsum = ngrams[[row1, row2]].min(0).sum()
+            maxsum = ngrams[[row1, row2]].max(0).sum()
+            ruzicka = 1.0 - ( float(minsum) / maxsum)
+            distances[idx]['ruzicka'] = ruzicka
+            idx += 1
 
     outpath = os.path.join(output_dir, out_file)   
     with open(outpath, 'w') as f:
