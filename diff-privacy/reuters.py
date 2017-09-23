@@ -126,17 +126,12 @@ homedir = "/home/natasha/data/"
 data_train, data_authors, y_train, train_files, train_targets = load_training_data(homedir)
 data_test, data_test_authors, y_test, test_files, test_targets = load_test_data(homedir)
 
-#bow_test = []
-#for doc in data_test:
-#    bow = generate_bow_doc(doc, feature_names)
-#    bow_test.append(" ".join(bow))
-
 #bow_test, bow_files, feature_names = load_bow_data()
 func_test, func_files = load_func_data(homedir)
 
 print("Data laoded!")
 
-model = load_model()
+model = load_model(homedir)
 
 # write out the noisy documents
 noisy_test = []
