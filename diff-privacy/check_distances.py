@@ -81,8 +81,8 @@ def main(input_dir, output_dir, out_file):
         ruzicka = 1.0 - ( float(minsum) / maxsum)
         distances[i]['ruzicka'] = ruzicka
 
-    outfile = os.path.join(output_dir, 'distances.json')   
-    with open(outfile, 'w') as f:
+    outpath = os.path.join(output_dir, out_file)   
+    with open(outpath, 'w') as f:
         json.dump(distances, f)
 
 if __name__ == '__main__':
