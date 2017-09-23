@@ -5,6 +5,7 @@ from sklearn.naive_bayes import BernoulliNB, MultinomialNB
 from sklearn import metrics
 
 import numpy as np
+from multiprocessing import Pool
 
 import json
 import math
@@ -66,7 +67,7 @@ def run_bow_classifier(data_train, data_test, feature_names):
     return X_train, X_test, new_data_test
 
 # Create a noisy bag of words document given a bow document
-def create_noisy_doc(doc, scale, model):
+def create_noisy_doc(doc, scale):
     newdoc = []
     for word in doc:
         if word != 'XXXX' and word in model.vocab:
@@ -119,30 +120,11 @@ def load_func_data(homedir=""):
     indir = homedir+"datasets/reuters/problem-func/unknown/"
     return load_text_data(indir)
 
+
 # Load files for processing.
 homedir = "/home/natasha/data/"
 data_train, data_authors, y_train, train_files, train_targets = load_training_data(homedir)
 data_test, data_test_authors, y_test, test_files, test_targets = load_test_data(homedir)
-
-#NUM_FEATURES = 1000
-
-#feature_names, X_train_std, X_test_std = run_standard_classifier(NUM_FEATURES, data_train, y_train, data_test) 
-
-#train = {'x' : X_train_std, 'y' : y_train}
-#test = {'x' : X_test_std, 'y': y_test}
-#std_score = classify(train, test)
-
-# Build a classifier using the top n features for test only and predict a result
-#X_train_bow, X_test_bow, bow_test = run_bow_classifier(data_train, data_test, feature_names) 
-#train = {'x' : X_train_bow, 'y' : y_train}
-#test = {'x' : X_test_bow, 'y': y_test}
-#bow_score = classify(train, test)
-
-radius = 1.5
-epsilon = 1.0
-scale = float(radius/epsilon)
-
-output_range = slice(0,2)
 
 #bow_test = []
 #for doc in data_test:
@@ -159,17 +141,16 @@ model = load_model()
 # write out the noisy documents
 noisy_test = []
 for test_doc in func_test[output_range]:
-    noisy_bow = create_noisy_doc(test_doc.split(), scale, model)
+    noisy_bow = create_noisy_doc(test_doc.split(), scale)
     noisy_bow = " ".join(noisy_bow)
     noisy_bow = re.sub(r"_", r" ", noisy_bow)
     noisy_test.append(noisy_bow)
 
-#print(noisy_test)
 
 testonly = True
 
 outdir = homedir + "datasets/reuters/problem-func-obf/"
-metafile = outdir + "meta-file.json"
+
 metadata = {
     "folder" : "unknown",
     "language": "EN",
@@ -178,18 +159,9 @@ metadata = {
     "unknown-texts" : []
 }   
 
-groundfile = outdir + "ground-truth.json"
 grounddata = {
     "ground-truth" : []
 }
-
-#training = {
-#    'data' : bow_train,
-#    'authors' : data_authors,
-#    'targets' : data_targets,
-#    'files' : train_files,
-#    'target_names' : train_targets
-#}
 
 test = {
     'data' : noisy_test,
@@ -197,29 +169,39 @@ test = {
     'targets' : y_test[output_range],
     'files' : func_files[output_range]
 }
-#if not testonly:
-#    metadata = write_training_data(training, outdir, metadata)
+
 metadata, grounddata = write_obf_data(test, outdir, metadata, grounddata)
 
-if not testonly:
-    with open(metafile, 'w') as meta:
-        json.dump(metadata, meta)
-    
-with open(groundfile, 'w') as ground:
-    json.dump(grounddata, ground)
+def obfuscate(doc, scale):
+    noisy_doc = create_noisy_doc(doc.split(), scale)
+    noisy_doc = " ".join(noisy_doc)
+    noisy_doc = re.sub(r"_", r" ", noisy_doc)
+    return noisy_doc
 
 
-#X_train_noisy, X_test_noisy, noisy_bow_test = run_noisy_classifier(data_train, bow_test, scale)
-#train = {'x' : X_train_noisy, 'y' : y_train}
-#test = {'x' : X_test_noisy, 'y': y_test}
-#noisy_score = classify(train, test) 
-#save_json(noisy_bow_test, "datasets/reuters/corpus-noisy/noisy_test_" + str(NUM_FEATURES) + ".json")
+def main(input_dir, output_dir):
 
-#for i in range(10):
-#    X_train_noisy, X_test_noisy, noisy_bow_test = run_noisy_classifier(data_train, bow_test)
-#    train = {'x' : X_train_noisy, 'y' : y_train}
-#    test = {'x' : X_test_noisy, 'y': y_test}
-#    noisy_score = classify(train, test) # 0.599
-#    if i == 0:
-#        save_json(noisy_bow_test, "datasets/reuters/corpus-noisy/noisy_test_" + str(NUM_FEATURES) + ".json")
+    files = os.listdir(input_dir)
+    model = load_model()
+    radius = 1.5
+    epsilon = 10.0
+    scale = float(radius/epsilon)
 
+    params = [(os.path.join(input_dir, file), output_dir, scale) for file in files]
+    pool = Pool()
+    pool.map(obfuscate, params)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-i", action="store", help="input directory")
+    parser.add_argument("-o", action="store", help="output directory")
+    args = vars(parser.parse_args())
+
+    input_dir = args["i"]
+    output_dir = args["o"]
+
+    if not input_dir or not output_dir:
+        parser.print_help()
+
+    main(input_dir, output_dir)
