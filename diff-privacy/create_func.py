@@ -7,6 +7,7 @@
 from sklearn.feature_extraction.text import TfidfVectorizer, CountVectorizer
 import argparse
 import os
+import re
 
 def load_text(f):
     with open(f, 'r', encoding='utf-8') as dfile:
@@ -28,7 +29,7 @@ def get_files(d):
 def obfuscate(doc):
     vectorizer = CountVectorizer(max_df=0.5,stop_words='english')
     tokeniser = vectorizer.build_analyzer()
-    nf_doc = [w for w in tokeniser(doc)]
+    nf_doc = [w for w in tokeniser(doc) if not re.search(r'xxxx', w)]
     return ' '.join(nf_doc)
 
 def main(indir):
